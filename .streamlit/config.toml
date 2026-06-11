@@ -1,0 +1,13 @@
+# Desliga o file-watcher: ele tenta inspecionar submódulos do transformers
+# (processadores de imagem que pedem torchvision, não usado aqui) e despeja
+# tracebacks inofensivos no terminal. Sem watcher, não há hot-reload — reinicie
+# o servidor após editar o código.
+[server]
+fileWatcherType = "none"
+headless = true
+
+[browser]
+gatherUsageStats = false
+
+[logger]
+level = "warning"

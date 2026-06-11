@@ -27,6 +27,8 @@ def _init() -> None:
         cur = dbapi_conn.cursor()
         cur.execute("PRAGMA journal_mode=WAL")
         cur.execute("PRAGMA synchronous=NORMAL")
+        # Espera até 30s por um lock em vez de falhar na hora (ex.: UI + CLI juntos).
+        cur.execute("PRAGMA busy_timeout=30000")
         cur.close()
 
     Base.metadata.create_all(_engine)
