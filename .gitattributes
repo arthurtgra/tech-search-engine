@@ -1,0 +1,4 @@
+# Normaliza line endings: LF no repositório, conversão automática no checkout.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
