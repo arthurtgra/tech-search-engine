@@ -43,8 +43,10 @@ st.markdown(
         color: #e2e8f0; padding: 1.2rem 1.4rem; border-radius: 14px;
         border-left: 4px solid #6366f1; font-size: 1.02rem; line-height: 1.55;
       }
+      /* Fundo translúcido: legível em tema claro OU escuro (não força cor de texto). */
       div[data-testid="stMetric"] {
-        background: #f8fafc; border: 1px solid #e2e8f0;
+        background: rgba(127, 127, 127, 0.10);
+        border: 1px solid rgba(127, 127, 127, 0.25);
         padding: 0.8rem 1rem; border-radius: 12px;
       }
     </style>
