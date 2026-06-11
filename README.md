@@ -10,6 +10,18 @@ python main.py investigate "RAG techniques" --max 80 --since 180
 python main.py status
 ```
 
+### Interface visual (Streamlit)
+
+```bash
+streamlit run app.py
+```
+
+Abre em `http://localhost:8501`. Barra lateral para definir o tema e os
+parâmetros; o relatório aparece com cards de métrica, abas por tipo de
+entidade, gráficos de momentum e **grafo de co-ocorrência**. Modo
+"Relatórios salvos" navega os `.md` já gerados. Compartilha o mesmo pipeline
+da CLI (`tie.pipeline.run_investigation`).
+
 ## O que diferencia isto de um LLM comum
 
 1. **Frescor** — dados posteriores ao cutoff do modelo.

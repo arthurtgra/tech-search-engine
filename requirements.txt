@@ -6,6 +6,7 @@ sentence-transformers>=3.0
 lancedb>=0.13
 typer>=0.12
 rich>=13.7
+streamlit>=1.36
 ollama>=0.3
 tenacity>=8.3
 python-dateutil>=2.9
