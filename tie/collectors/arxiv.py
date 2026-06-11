@@ -21,8 +21,9 @@ class ArxivCollector(Collector):
         return self.settings.arxiv_min_interval_s
 
     def collect(self, query: str, *, max_results: int = 100, since_days: int = 365) -> Iterable[RawDocument]:
+        cats = " OR ".join(f"cat:{c}" for c in self.settings.arxiv_categories)
         params = {
-            "search_query": f"all:{query}",
+            "search_query": f"(all:{query}) AND ({cats})",
             "start": 0,
             "max_results": max_results,
             "sortBy": "submittedDate",

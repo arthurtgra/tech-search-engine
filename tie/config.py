@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
 CACHE_DIR = DATA_DIR / "cache"
 LANCEDB_DIR = DATA_DIR / "lancedb"
+REPORTS_DIR = DATA_DIR / "reports"
 DB_PATH = DATA_DIR / "tie.db"
 
 
@@ -38,8 +39,19 @@ class Settings:
     default_window_days: int = 365
     trend_bucket_days: int = 30
 
+    # Filtro de relevância
+    # Categorias arXiv aceitas — evita papers de física/matemática que casam
+    # por acaso com a query textual (ex.: "agent" em dinâmica de partículas).
+    arxiv_categories: tuple[str, ...] = (
+        "cs.AI", "cs.LG", "cs.CL", "cs.MA", "cs.CV", "cs.RO", "cs.SE", "stat.ML",
+    )
+    # Similaridade de cosseno mínima (busca semântica) para um doc entrar na análise.
+    # OBS: BGE comprime similaridades em ~0.5-0.8; este é um filtro secundário leve.
+    # A relevância de tópico vem sobretudo do filtro de categoria do arXiv.
+    min_similarity: float = 0.5
+
     def __post_init__(self) -> None:
-        for d in (DATA_DIR, CACHE_DIR, LANCEDB_DIR):
+        for d in (DATA_DIR, CACHE_DIR, LANCEDB_DIR, REPORTS_DIR):
             d.mkdir(parents=True, exist_ok=True)
 
 

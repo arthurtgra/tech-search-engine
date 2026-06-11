@@ -64,13 +64,22 @@ def build_index(settings: Settings) -> int:
     return len(rows)
 
 
-def semantic_search(settings: Settings, query: str, *, top_k: int = 200) -> list[int]:
-    """Retorna doc_ids mais relevantes à pergunta."""
+def semantic_search(
+    settings: Settings, query: str, *, top_k: int = 200, min_similarity: float | None = None
+) -> list[int]:
+    """Retorna doc_ids relevantes à pergunta, cortando por similaridade de cosseno.
+
+    Com métrica cosseno, `_distance = 1 - cos`; mantemos só docs com cos >= limiar.
+    Isso filtra o que o filtro de categoria do collector não pegou.
+    """
+    threshold = settings.min_similarity if min_similarity is None else min_similarity
     db = lancedb.connect(str(LANCEDB_DIR))
     if _TABLE not in db.table_names():
         return []
     tbl = db.open_table(_TABLE)
     model = _model(settings.embed_model)
     qvec = model.encode(_QUERY_PREFIX + query, normalize_embeddings=True)
-    hits = tbl.search(qvec).select(["doc_id"]).limit(top_k).to_list()
-    return [h["doc_id"] for h in hits]
+    hits = (
+        tbl.search(qvec).metric("cosine").select(["doc_id"]).limit(top_k).to_list()
+    )
+    return [h["doc_id"] for h in hits if (1.0 - h["_distance"]) >= threshold]

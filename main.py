@@ -24,7 +24,7 @@ from tie.extract import extract_corpus
 from tie.index import build_index, semantic_search
 from tie.ingest import collect_and_store
 from tie.models import EntityType
-from tie.report import build_report, render
+from tie.report import build_report, render, save_report
 from tie.resolve import resolve_entities
 
 app = typer.Typer(add_completion=False, help="Technology Intelligence Engine")
@@ -46,6 +46,7 @@ def investigate(
     max_results: int = typer.Option(60, "--max", help="Máx. de itens por fonte"),
     since: int = typer.Option(365, "--since", help="Janela de coleta (dias)"),
     top_k: int = typer.Option(200, "--topk", help="Docs relevantes p/ análise"),
+    min_sim: float = typer.Option(0.5, "--min-sim", help="Similaridade mínima (cosseno)"),
 ) -> None:
     settings = load_settings()
 
@@ -63,8 +64,11 @@ def investigate(
 
     with console.status("[4/5] Indexando (embeddings BGE)..."):
         n_idx = build_index(settings)
-    doc_ids = semantic_search(settings, query, top_k=top_k)
-    console.print(f"[4/5] Index: +{n_idx} embedados | {len(doc_ids)} docs relevantes")
+    doc_ids = semantic_search(settings, query, top_k=top_k, min_similarity=min_sim)
+    console.print(
+        f"[4/5] Index: +{n_idx} embedados | {len(doc_ids)} docs relevantes "
+        f"(cos≥{min_sim})"
+    )
 
     with console.status("[5/5] Analisando padrões e gerando relatório..."):
         build_relations(doc_ids)
@@ -78,6 +82,32 @@ def investigate(
             ranked_by_type=ranked_by_type, cooccurrences=cooc,
         )
     render(report, console)
+    path = save_report(report)
+    console.print(f"\n[dim]Relatório salvo em:[/dim] {path}")
+
+
+@app.command()
+def reports(
+    show: int = typer.Option(0, "--show", help="Imprime o conteúdo do N-ésimo relatório (1=mais recente)"),
+) -> None:
+    """Lista os relatórios salvos (ou imprime um com --show N)."""
+    from tie.config import REPORTS_DIR
+
+    files = sorted(REPORTS_DIR.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if not files:
+        console.print("[yellow]Nenhum relatório salvo ainda. Rode 'investigate' primeiro.[/yellow]")
+        return
+    if show:
+        from rich.markdown import Markdown
+
+        console.print(Markdown(files[show - 1].read_text(encoding="utf-8")))
+        return
+    for i, f in enumerate(files, 1):
+        ts = f.stat().st_mtime
+        from datetime import datetime as _dt
+
+        console.print(f"{i:>2}. {f.name}  [dim]({_dt.fromtimestamp(ts):%Y-%m-%d %H:%M})[/dim]")
+    console.print("\n[dim]Veja um com:[/dim] python main.py reports --show 1")
 
 
 @app.command()

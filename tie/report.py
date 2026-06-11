@@ -7,7 +7,10 @@ evitar alucinação. As demais seções são determinísticas.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
 
 import ollama
 from rich.console import Console
@@ -15,7 +18,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from tie.analytics import CoOccurrence, RankedEntity
-from tie.config import Settings
+from tie.config import REPORTS_DIR, Settings
 from tie.models import EntityType
 
 # Tipos exibidos como seções dedicadas no relatório.
@@ -128,3 +131,51 @@ def render(report: TIEReport, console: Console | None = None) -> None:
         "extração depende da qualidade do LLM local.",
         title="Confiança & Limitações", border_style="red",
     ))
+
+
+def to_markdown(report: TIEReport) -> str:
+    """Serializa o relatório em Markdown versionável."""
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+    src = ", ".join(f"{k}={v}" for k, v in report.sources.items() if not k.endswith("error"))
+    out = [
+        f"# Technology Intelligence Engine — {report.query}",
+        "",
+        f"*Gerado em {ts} · {report.n_docs} documentos analisados · coleta: {src}*",
+        "",
+        "## Resumo executivo",
+        "",
+        report.summary,
+        "",
+    ]
+    for label, items in report.sections.items():
+        if not items:
+            continue
+        out += [f"## {label}", "", "| # | Entidade | Docs | Métrica | Momentum |",
+                "|---|---|---:|---:|---:|"]
+        for i, e in enumerate(items, 1):
+            mom = f"+{e.momentum}" if e.momentum > 1 else f"{e.momentum}"
+            out.append(f"| {i} | {e.name} | {e.doc_count} | {e.metric_sum:,.0f} | {mom} |")
+        out.append("")
+    if report.cooccurrences:
+        out += ["## Co-ocorrências (aparecem juntas)", "", "| Par | Peso |", "|---|---:|"]
+        for co in report.cooccurrences:
+            out.append(f"| {co.a} + {co.b} | {co.weight} |")
+        out.append("")
+    out += [
+        "## Confiança & Limitações",
+        "",
+        "Confiança = contagem de evidências (coluna Docs), não porcentagem inventada.",
+        "",
+        "Limitações: co-ocorrência ≠ sequência de pipeline; papers têm latência de "
+        "indexação; modelos fechados ficam sub-representados; extração depende do LLM local.",
+        "",
+    ]
+    return "\n".join(out)
+
+
+def save_report(report: TIEReport) -> Path:
+    """Grava o relatório em data/reports/<slug>-<timestamp>.md e retorna o caminho."""
+    slug = re.sub(r"[^a-z0-9]+", "-", report.query.lower()).strip("-")[:40] or "report"
+    path = REPORTS_DIR / f"{slug}-{datetime.now():%Y%m%d-%H%M%S}.md"
+    path.write_text(to_markdown(report), encoding="utf-8")
+    return path
