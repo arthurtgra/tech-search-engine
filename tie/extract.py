@@ -144,26 +144,38 @@ def _upsert_entity(session, name: str, etype: str, doc_date) -> Entity:  # noqa:
 
 
 def extract_corpus(settings: Settings, limit: int | None = None) -> int:
-    """Extrai entidades dos documentos ainda não processados. Retorna nº de docs."""
-    processed = 0
+    """Extrai entidades dos documentos ainda não processados. Retorna nº de docs.
+
+    Uma transação curta POR documento: a chamada lenta ao LLM acontece FORA de
+    qualquer transação de escrita, e o lock de escrita do SQLite é segurado só
+    durante o commit de cada doc. Isso evita prender o banco por minutos (e o
+    consequente 'database is locked' quando UI e CLI rodam juntos).
+    """
     with get_session() as session:
-        q = session.query(Document).filter(Document.extracted == 0)
+        q = session.query(Document.id).filter(Document.extracted == 0)
         if limit:
             q = q.limit(limit)
-        docs = q.all()
-        for doc in docs:
-            extracted = extract_for_document(settings, doc.title, doc.text)
+        doc_ids = [row[0] for row in q.all()]
+
+    processed = 0
+    for doc_id in doc_ids:
+        with get_session() as session:  # leitura curta
+            doc = session.get(Document, doc_id)
+            title, text, pub = doc.title, doc.text, doc.published_at
+
+        extracted = extract_for_document(settings, title, text)  # LLM, sem lock
+
+        with get_session() as session:  # escrita curta (1 commit por doc)
             for e in extracted:
-                ent = _upsert_entity(session, e.name, e.type, doc.published_at)
+                ent = _upsert_entity(session, e.name, e.type, pub)
                 session.add(
                     Mention(
-                        document_id=doc.id, entity_id=ent.id,
+                        document_id=doc_id, entity_id=ent.id,
                         raw_text=e.name[:255], confidence=1.0,
                     )
                 )
                 ent.mention_count += 1
+            doc = session.get(Document, doc_id)
             doc.extracted = 1
-            processed += 1
-            if processed % 10 == 0:
-                session.flush()
+        processed += 1
     return processed
